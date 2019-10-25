@@ -1,0 +1,53 @@
+---
+    - name: Does the Docker file exist?
+      command: test -f /etc/default/docker
+      register: docker_exists
+      ignore_errors: true
+
+    - name: Install Docker dependencies
+      apt: name={{item}} state=latest
+      with_items:
+        - apt-transport-https
+        - ca-certificates
+        - curl
+
+    - name: add docker repo
+      shell: curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo apt-key add -
+      become: true
+
+    - name: add repo
+      shell: add-apt-repository "deb [arch=amd64] https://download.docker.com/linux/ubuntu bionic stable"
+      become: true
+
+    - name: update repo
+      shell: apt-get update
+      become: true
+
+    - name: Install Docker 
+      apt: name={{item}} state=latest
+      with_items:
+        - docker-ce
+    
+    - name: "add user to docker group"
+      user: name='vagrant'
+        groups=docker
+        append=yes
+      when: docker_exists.rc == 1
+
+    - name: Add docker compose
+      shell: curl -L https://github.com/docker/compose/releases/download/1.22.0/docker-compose-`uname -s`-`uname -m` > /usr/local/bin/docker-compose
+      when: docker_exists.rc == 1
+
+    - name: Add docker compose step two
+      shell: chmod +x /usr/local/bin/docker-compose
+      when: docker_exists.rc == 1
+
+    - name: Login to sstools Docker Regirstry
+      shell: docker login sstools.services.plat.fi:443 -u vagrant -p vagrant
+
+    - name: Add docker ownerhip 
+      shell: chown vagrant:vagrant -R /home/vagrant/.docker
+
+    - name: Adding existing user vagrant to group docker
+      user: name=vagrant groups=docker append=yes
+

@@ -1,0 +1,31 @@
+---
+- name: Install add-apt-repostory
+  apt: name=software-properties-common state=latest
+
+- name: Accept Java 10 License
+  debconf: name='oracle-java10-installer' question='shared/accepted-oracle-license-v1-1' value='true' vtype='select'
+
+- name: Uninstall openjdk
+  apt: name=openjdk* state=absent
+
+- name: Install Oracle Java 10
+  apt: name={{item}} state=latest
+  with_items:
+    - oracle-java10-installer
+    - ca-certificates
+    - oracle-java10-set-default
+
+- name: Do we need to add sert to cacerts?
+  command: test -f /usr/lib/jvm/java-10-oracle/lib/security/CGI_WLG_Welfare_Root_CA.crt
+  register: wlgsert_exists
+  ignore_errors: true
+
+- name: copy root certificate
+  template: src=templates/CGI_WLG_Welfare_Root_CA.crt dest=/usr/lib/jvm/java-10-oracle/lib/security/CGI_WLG_Welfare_Root_CA.crt
+  when: wlgsert_exists.rc == 1
+  ignore_errors: true
+
+- name: Add sertificate if not exists
+  command: /usr/lib/jvm/java-10-oracle/bin/keytool -import -noprompt -trustcacerts -keypass changeit -storepass changeit -alias WLG_ROOT -file /usr/lib/jvm/java-10-oracle/lib/security/CGI_WLG_Welfare_Root_CA.crt -keystore /usr/lib/jvm/java-10-oracle/lib/security/cacerts
+  when: wlgsert_exists.rc == 1
+  ignore_errors: true
